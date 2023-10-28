@@ -94,13 +94,13 @@ contract LoanNFT is ERC721Enumerable, ERC721Holder {
     }
 
     //For a given Minter & TokenID store an instance of the LoanerDetails struct
-    mapping(address => mapping(uint256 => LoanerDetails)) public loanerDetails;
+    mapping(address collection => mapping(uint256 tokenId => LoanerDetails loanerDetails)) public loanerDetails;
 
     //For a given Minter & TokenID store the token ID that represents the current loan 
-    mapping(address => mapping(uint256 => uint256)) public loanTokenIDs;
+    mapping(address collection => mapping(uint256 tokenId => uint256 counter)) public loanTokenIDs;
 
     //For a given lender address store an array of tokenIDs that they are lending out
-    mapping(address => uint256[]) public lendersActiveTokens;
+    mapping(address lender => uint256[] tokenIDs) public lendersActiveTokens;
 
     //This is the deployer & will be able to call the init function once
     address private initiator;
@@ -188,7 +188,7 @@ contract LoanNFT is ERC721Enumerable, ERC721Holder {
         // delete loanerDetails[minter][tokenID];
 
         // Iterate over the approved borrowers, delete their approval to borrow
-        for(uint256 i = 0; i < details.allowedBorrowersByLoaner.length;){
+        for(uint256 i; i < details.allowedBorrowersByLoaner.length;){
 
             delete details.allowedBorrowers[details.allowedBorrowersByLoaner[i]];
 
@@ -359,7 +359,7 @@ contract LoanNFT is ERC721Enumerable, ERC721Holder {
         _borrowerDetails.loanTokenIds.push(newItemId);
 
         // Iterate over the approved borrowers, delete their approval to borrow
-        for(uint256 i = 0; i < details.allowedBorrowersByLoaner.length;){
+        for(uint256 i; i < details.allowedBorrowersByLoaner.length;){
 
             delete details.allowedBorrowers[details.allowedBorrowersByLoaner[i]];
 
@@ -397,6 +397,11 @@ contract LoanNFT is ERC721Enumerable, ERC721Holder {
         (bool success, ) = msg.sender.call{value:loan.collateral}("");
         if(!success) revert PayoutError();
 
+        // Settle the stream if not depleted
+        if (!sablier.isDepleted(loan.streamId)) {
+          sablier.withdrawMax({ streamId: loan.streamId, to: loan.lender });
+        }
+
         removeFromArray(lendersActiveTokens[loan.lender],loanTokenID);
 
         // Update loan status and user loan history
@@ -411,8 +416,26 @@ contract LoanNFT is ERC721Enumerable, ERC721Holder {
         emit NFTReturned(minter, tokenID, msg.sender);
     }
 
+    // Exposing functionality for loaner to withdraw the accrued fees 
+    // from the sablier stream
+    function withdrawAccruedFee(address minter, uint256 tokenID) external {
+        //Retrieve the loan Token ID
+        uint256 loanTokenID = loanTokenIDs[minter][tokenID];
+
+        //Retrieve a storage pointer to te Loan details
+        Loan storage loan = loans[loanTokenID];
+
+        //Check that the caller is the borrower
+        if(loan.lender != msg.sender) revert NotLoaner();
+
+        //Withdraw max stream available from stream if not depleted
+        if (!sablier.isDepleted(loan.streamId)) {
+          sablier.withdrawMax({ streamId: loan.streamId, to: loan.lender });
+        }
+    }
+
     function removeFromArray(uint256[] storage arr, uint256 toRemove) private {
-        for(uint256 i = 0 ; i < arr.length;){
+        for(uint256 i; i < arr.length;){
 
             if(arr[i] == toRemove){
                 arr[i] = arr[arr.length-1];
@@ -444,6 +467,12 @@ contract LoanNFT is ERC721Enumerable, ERC721Holder {
         (bool success, ) = msg.sender.call{value:loan.collateral}("");
         if(!success) revert PayoutError();
 
+        // Withdraw remaining stream
+        sablier.withdrawMax({ streamId: loan.streamId, to: msg.sender });
+
+        // Cancel rest of the stream
+        sablier.cancel(loan.streamId);
+
         removeFromArray(lendersActiveTokens[loan.lender],tokenId);
         
         // Update loan status and user loan history
@@ -467,7 +496,7 @@ contract LoanNFT is ERC721Enumerable, ERC721Holder {
         uint256[] memory borrowerTokens = borrowerDetails[borrower].loanTokenIds;
 
         //Iterate through the loanTokens
-        for (uint256 i = 0; i < borrowerTokens.length; ) {
+        for (uint256 i; i < borrowerTokens.length; ) {
             
             //If the current time is greater than the time that the token was supposed to be borrowed until
             if (block.timestamp > loans[borrowerTokens[i]].borrowTimeUntil) {
