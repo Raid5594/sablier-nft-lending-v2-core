@@ -593,7 +593,7 @@ contract LoanNFT is ERC721Enumerable, ERC721Holder {
         if(from != address(0) && to != address(0)) revert SoulboundToken();
     }
     
-    function _performTask(string memory task, address effectedAddress) internal override {
+    function _performTask(string memory task, address effectedAddress) internal {
         bytes32 bytesTask = keccak256(abi.encode(task));
 
         ILoanNFT.BorrowerDetails storage details = borrowerDetails[effectedAddress];
