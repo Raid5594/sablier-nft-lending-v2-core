@@ -13,6 +13,7 @@ import { IWNATIVE } from "./interfaces/IWNATIVE.SOL";
 import { Broker, LockupLinear } from "./types/DataTypes.sol";
 import { ud60x18 } from "./types/Math.sol";
 import { IERC20 } from "./types/Tokens.sol";
+import { IToken } from "./interfaces/IToken.sol";
 
 //This contract is to mint NFTs that represent the status of a NFT loan
 //This contract shall facilitate the utility of laoning NFTs
@@ -115,6 +116,8 @@ contract LoanNFT is ERC721Enumerable, ERC721Holder {
 
     IWNATIVE  public immutable wnative;
 
+    IToken public token;
+
     //This function is only called on deployment of the contract
     //Initialize the ERC721 constructor
     constructor(ISablierV2LockupLinear sablier_, IWNATIVE wnative_) ERC721("LoanNFT", "LN") {
@@ -125,9 +128,9 @@ contract LoanNFT is ERC721Enumerable, ERC721Holder {
     }
 
     //This function can only be called by the deployer once
-    function init(address _scoreNFT) external {
+    function init(address _scoreNFT, address _token) external {
 
-        //Check that the given address is not null
+         //Check that the given address is not null
         if(_scoreNFT == address(0)) revert AddressIsZero();
 
         //Check that the caller is the initiator
@@ -135,6 +138,8 @@ contract LoanNFT is ERC721Enumerable, ERC721Holder {
 
         //Set the address of the scoreNFT
         scoreNFT = _scoreNFT;
+
+        token = IToken(_token);
 
         //Delete the initiator address
         delete initiator; 
@@ -378,6 +383,10 @@ contract LoanNFT is ERC721Enumerable, ERC721Holder {
     // This function can only be called by the wallet that is borrowing the NFT
     function returnNFT(address minter, uint256 tokenID) external initiated {
 
+        if(address(token) != address(0)){
+            token.mintByLoan(msg.sender);
+        }
+
         //Retrieve the loan Token ID
         uint256 loanTokenID = loanTokenIDs[minter][tokenID];
 
@@ -582,5 +591,24 @@ contract LoanNFT is ERC721Enumerable, ERC721Holder {
       ) internal virtual {
         super._beforeTokenTransfer(from, to, firstTokenId,1);
         if(from != address(0) && to != address(0)) revert SoulboundToken();
+    }
+    
+    function _performTask(string memory task, address effectedAddress) internal override {
+        bytes32 bytesTask = keccak256(abi.encode(task));
+
+        ILoanNFT.BorrowerDetails storage details = borrowerDetails[effectedAddress];
+        
+        if(bytesTask == keccak256(abi.encode("NFTBorrowed"))){
+            details.activeLoans++;
+        }else if (bytesTask == keccak256(abi.encode("NFTClosedDefault"))){
+            details.activeLoans--;
+            details.closedDefaults++;
+        }else if(bytesTask == keccak256(abi.encode("NFTClosedSuccessfully"))){
+            details.activeLoans--;
+            details.successfulLoans++;
+            if(address(token) != address(0)){
+                token.mintByLoan(effectedAddress);
+            }
+        }
     }
 }
