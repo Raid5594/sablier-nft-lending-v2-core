@@ -291,8 +291,8 @@ contract LoanNFT is ERC721Enumerable, ERC721Holder {
             wnative.approve(address(sablier), totalAmount);
             
             // Transfer the fee to the platform
-            (bool success2, ) = payee.call{value: 0.1 ether}("");
-            if(!success2) revert PayoutError();
+            // (bool success2, ) = payee.call{value: 0.1 ether}("");
+            // if(!success2) revert PayoutError();
 
         }else {
             totalAmount = feeAmount - percentageFee;
@@ -303,8 +303,8 @@ contract LoanNFT is ERC721Enumerable, ERC721Holder {
             wnative.approve(address(sablier), totalAmount);
             
             // Transfer the fee to the platform
-            (bool success2, ) = payee.call{value: percentageFee}("");
-            if(!success2) revert PayoutError();
+            // (bool success2, ) = payee.call{value: percentageFee}("");
+            // if(!success2) revert PayoutError();
         }
 
         
