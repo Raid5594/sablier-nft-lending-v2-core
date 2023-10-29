@@ -56,7 +56,7 @@ abstract contract Communicator is IWormholeReceiver {
     function Send(
         string memory message,
         address effectedAddress
-    ) external payable {
+    ) public payable {
         // Get a quote for the cost of gas for delivery
         (uint256 cost, ) = wormholeRelayer.quoteEVMDeliveryPrice(
             targetChain,

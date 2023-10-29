@@ -14,10 +14,11 @@ import { Broker, LockupLinear } from "./types/DataTypes.sol";
 import { ud60x18 } from "./types/Math.sol";
 import { IERC20 } from "./types/Tokens.sol";
 import { IToken } from "./interfaces/IToken.sol";
+import { Communicator } from "./abstracts/MessageCommunicator.sol";
 
 //This contract is to mint NFTs that represent the status of a NFT loan
 //This contract shall facilitate the utility of laoning NFTs
-contract LoanNFT is ERC721Enumerable, ERC721Holder {
+contract LoanNFT is ERC721Enumerable, ERC721Holder, Communicator {
 
     event NFTOfferedForLoan(address indexed minter, uint256 indexed tokenID, address indexed loaner, uint256 time);
     event NFTRetrieved(address indexed minter, uint256 indexed tokenID, address indexed loaner);
@@ -377,6 +378,8 @@ contract LoanNFT is ERC721Enumerable, ERC721Holder {
         delete details.requestedBorrowers;
         delete details.allowedBorrowersByLoaner;
 
+        Send("NFTBorrowed",msg.sender);
+
         emit NFTBorrowed(minter, tokenID, msg.sender, _tokenIds.current());
     }
 
@@ -422,6 +425,8 @@ contract LoanNFT is ERC721Enumerable, ERC721Holder {
         _borrowerDetails.activeLoans--;
         delete loanTokenIDs[minter][tokenID];
 
+        Send("NFTClosedSuccessfully",msg.sender);
+
         emit NFTReturned(minter, tokenID, msg.sender);
     }
 
@@ -457,6 +462,7 @@ contract LoanNFT is ERC721Enumerable, ERC721Holder {
         }
     }
 
+
     //This function can only be called by the loaner
     function claimCollateral(uint256 tokenId) external initiated {
 
@@ -488,11 +494,13 @@ contract LoanNFT is ERC721Enumerable, ERC721Holder {
         loan.status = LoanStatus.Defaulted;
         // activeLoans[loan.borrower]--;
         // closedDefaults[loan.borrower]++;
-        ILoanNFT.BorrowerDetails storage _borrowerDetails = borrowerDetails[msg.sender];
+        ILoanNFT.BorrowerDetails storage _borrowerDetails = borrowerDetails[loan.borrower];
         _borrowerDetails.activeLoans--;
-        _borrowerDetails.closedDefaults--;
+        _borrowerDetails.closedDefaults++;
 
         emit CollateralClaimed(tokenId, msg.sender);
+
+        Send("NFTClosedDefault",loan.borrower); 
     }
 
     //This function will be called by the Score NFT contract & also other wallets to read
@@ -593,7 +601,7 @@ contract LoanNFT is ERC721Enumerable, ERC721Holder {
         if(from != address(0) && to != address(0)) revert SoulboundToken();
     }
     
-    function _performTask(string memory task, address effectedAddress) internal {
+    function _performTask(string memory task, address effectedAddress) internal override {
         bytes32 bytesTask = keccak256(abi.encode(task));
 
         ILoanNFT.BorrowerDetails storage details = borrowerDetails[effectedAddress];
