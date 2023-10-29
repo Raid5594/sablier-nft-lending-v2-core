@@ -28,7 +28,10 @@ function sleep(ms) {
 async function deploy() {
   console.log("Deploying LoanNFT... on Polygon");
   const PolygonLoanFactory = new ethers.ContractFactory(LoanABI, LoanBytecode, polygonWallet);
-  const PolygonloanContract = await PolygonLoanFactory.deploy();
+  const PolygonloanContract = await PolygonLoanFactory.deploy(
+    "0x67422C3E36A908D5C3237e9cFfEB40bDE7060f6E",
+    "0xA6fC2859C32c9884cD67635b190A9D4399Eedd31",
+  );
   await PolygonloanContract.deployed();
   console.log("LoanNFT deployed at:", PolygonloanContract.address);
 
@@ -50,7 +53,10 @@ async function deploy() {
 
   console.log("Deploying LoanNFT... on Bsc");
   const BscLoanFactory = new ethers.ContractFactory(LoanABI, LoanBytecode, bscWallet);
-  const BscloanContract = await BscLoanFactory.deploy();
+  const BscloanContract = await BscLoanFactory.deploy(
+    "0x3FE4333f62A75c2a85C8211c6AeFd1b9Bfde6e51",
+    "0xA6fC2859C32c9884cD67635b190A9D4399Eedd31",
+  );
   await BscloanContract.deployed();
   console.log("LoanNFT deployed at:", BscloanContract.address);
 
